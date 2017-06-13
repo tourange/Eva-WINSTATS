@@ -1,0 +1,69 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r}
+CH_train = read.table(file.choose(),header=T,sep=",")
+CH_test = read.table(file.choose(),header=T,sep=",")
+#CH_test = CH_test[-c( 131, 446, 524 ),]
+#CH_train = CH_train[-c( 131, 446, 524 ),]
+CH_train$ListPrice = log(CH_train$ListPrice)
+str(CH_train)
+```
+
+```{r}
+lm1 = lm(ListPrice~.,data=CH_train)
+plot(lm1)
+summary(lm1)
+anova(lm1)
+#Zip, DOM, Latitude and Longitude were not significant. Remove from lm
+```
+```{r}
+lm2 = lm(ListPrice~.-ZIP-DOM-LATITUDE-LONGITUDE,data=CH_train)
+summary(lm2)
+```
+
+```{r}
+plot(CH_train$ImputedSQFT,CH_train$ListPrice)
+# Kind of looks cubic. Going to make this term cubic! Yeah!
+
+# Also, assuming type and city interact, because a big house in a city will be more expensive than a big house in the suburbs (usually)
+lm3 = lm(ListPrice~poly(ImputedSQFT,3)+Type*City+BEDS+BATHS+ParkSpots+HasGarage+BeenReduced+SoldPrev-ZIP-DOM-LATITUDE-LONGITUDE,data=CH_train)
+summary(lm3) #shows that  ARS = 0.8176
+
+anova(lm3)
+#now BEDS is not significant anymore - makes sense because BEDS and BATHS are probably correlated. Remove BEDS
+
+lm4 = lm(ListPrice~poly(ImputedSQFT,3)+Type*City+BATHS+ParkSpots+HasGarage+BeenReduced+SoldPrev-BEDS-ZIP-DOM-LATITUDE-LONGITUDE,data=CH_train)
+# ARS = 0.8171 - went down. Put BEDS back in!!!
+
+# I'm getting errors so I'm going to try taking things out again - BEDS and SoldPrev are not as significant
+lm5 = lm(ListPrice~poly(ImputedSQFT,3)+Type*City+BATHS+ParkSpots+HasGarage+BeenReduced+SoldPrev-BEDS-SoldPrev-ZIP-DOM-LATITUDE-LONGITUDE,data=CH_train)
+# ARS went down
+```
+
+```{r}
+# Got errors - dropped observations 131,446,524 from CH_test and CH_train...didn't help!
+# Warning messages:
+# 1: not plotting observations with leverage one:
+#   131, 446, 524 
+# 2: not plotting observations with leverage one:
+#   131, 446, 524 
+# 3: In sqrt(crit * p * (1 - hh)/hh) : NaNs produced
+# 4: In sqrt(crit * p * (1 - hh)/hh) : NaNs produced
+
+# Then I got:
+# > ypredlog = predict(lm3, newdata = CH_test)
+# prediction from a rank-deficient fit may be misleading> ypred = exp(ypredlog)
+# > yactual = exp(CH_test$ListPrice)
+# > plot(yactual, ypred, xlab="Actual Price", ylab="Predicted Price")
+# no non-missing arguments to min; returning Infno non-missing arguments to max; returning -InfError in plot.window(...) : need finite 'xlim' values
+
+ypredlog = predict(lm5, newdata = CH_test)
+ypred = exp(ypredlog)
+yactual = exp(CH_test$ListPrice)
+plot(yactual, ypred, xlab="Actual Price", ylab="Predicted Price")
+
+PredAcc(yactual, ypred)
+```
+
