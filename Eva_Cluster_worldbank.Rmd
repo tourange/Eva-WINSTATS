@@ -1,0 +1,68 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+wb = read.csv("WorldBank.csv")
+row.names(wb) = wb$Country.Name
+wb_1 = wb[,c(13,14,16,17,25,33,42,43,44,52,53)]
+wb.scale = scale(wb_1)
+```
+
+```{r, fig.width=15,fig.height=15}
+wb.dist = dist(wb_1.na.scale, method = "euclidean")
+wb.clust = hclust(wb.dist, method="ward.D")
+plot(wb.clust)
+```
+```{r}
+wb_1.na = na.omit(wb_1)
+dim(wb_1.na)
+wb_1.na.scale = scale(wb_1.na)
+```
+
+# The only things I can really pick out are that Cluster 4 is some of the most developed countries
+# Also, it seems like Cluster 8 is grouped because it has mostly NA values (North Korea, Cuba)
+# Clusters 8, 10 outliers (Cluster 10 just Sierra Leone and Yemen)?
+# Mostly grouping by NA values I think :(
+```{r}
+country.grps = cutree(wb.clust, k=10)
+clust.grps(wb_1.na,country.grps,parcoord=TRUE)
+```
+
+#Trying to get a random subset of the countries so it's more readable
+# Cluster 1 is by far the largest - outliers throwing it off?? This group only has data for Telephone and PerInternet
+# Throws off the groups a lot - United States/Canada/
+
+```{r}
+wb.sub <- wb_1[sample(1:nrow(wb_1),50,replace=FALSE),]
+wb.sub.scale = scale(wb.sub)
+wb.sub.dist = dist(wb.sub.scale, method = "euclidean")
+wb.sub.clust = hclust(wb.sub.dist, method="ward.D")
+plot(wb.sub.clust)
+country.sub.grps = cutree(wb.sub.clust, k=10)
+clust.grps(wb_1,country.sub.grps,parcoord=TRUE)
+```
+
+
+```{r}
+library(corrplot)
+wb_1.naomit = na.omit(wb_1)
+WB.cor = cor(wb_1.naomit)
+corrplot(WB.cor, tl.cex=.6)
+corrplot(WB.cor,order="hclust", tl.cex=0.6)
+```
+
+
+```{r, fig.height=15, fig.width=15}
+wb_1.pca = princomp(wb_1.naomit, cor=TRUE)
+biplot(wb_1.pca, )
+```
+
+```{r}
+wb_1.pca$loadings
+wb_1.R = cor(wb_1.naomit)
+wb_1.PCA = eigen(wb_1.R)
+```
+
