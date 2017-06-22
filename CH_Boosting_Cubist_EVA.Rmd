@@ -1,0 +1,94 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Random forest:
+```{r}
+home.rf = randomForest(log(ListPrice)~.,data=ChiTrain2)
+home.rf
+
+chi.final = randomForest(log(ListPrice)~.,mtry=3,ntree=200,data=ChiTrain2)
+plotmo(chi.final)
+
+ytest = predict(chi.final,newdata=ChiTest2)
+ytest= exp(ytest)
+PredAcc(ChiTest2$ListPrice,ytest)
+```
+Boosted tree:
+NOTE, I DID NOT MAKE A VALIDATION SET
+```{r}
+Chi.gbm = gbm(log(ListPrice)~.,data=ChiTrain2,distribution="gaussian",n.trees=5000,shrinkage=.01,interaction.depth=4,
+              bag.fraction=0.5,train.fraction=.8,n.minobsinnode = 5,cv.folds=5,keep.data = T,verbose=F)
+Chi.gbm
+#gbm.perf(Chi.gbm,method="OOB")
+#gbm.perf(Chi.gbm,method="test")
+#gbm.perf(Chi.gbm,method="cv") #Best iteration at 1837
+```
+
+```{r}
+ypred = predict(Chi.gbm,newdata=ChiTest2,n.trees=1837)
+plot(log(ChiTrain2$ListPrice),ypred,xlab="Actual log(Price)", ylab="Fitted log(Price)")
+abline(0,1,lwd=3,col="blue")
+# doing a poor job at the tails of the data (extremes?)
+
+# in the originl scale:
+ypred2 = exp(ypred)
+plot(ChiTrain2$ListPrice,ypred2,xlab="Actual Price ($)",ylab="Fitted Price ($)")
+abline(0,1,lwd=3,col="blue")
+# Better for cheaper homes, does poorly for more expensive homes
+
+PredAcc(ypred2,ChiTest2$ListPrice)
+# MAPE = 18.03286
+```
+
+```{r}
+#Experimenting with trees
+Chi.gbm = gbm(log(ListPrice)~.,data=ChiTrain2,distribution="gaussian",n.trees=10000,shrinkage=.01,interaction.depth=4,
+              bag.fraction=0.5,train.fraction=.8,n.minobsinnode = 5,cv.folds=5,keep.data = T,verbose=F)
+ypred = predict(Chi.gbm,newdata=ChiTest2,n.trees=1837)
+ypred2 = exp(ypred)
+PredAcc(ypred2,ChiTest2$ListPrice)
+# MAPE = 17.87599
+```
+```{r}
+Chi.gbm = gbm(log(ListPrice)~.,data=ChiTrain2,distribution="gaussian",n.trees=10000,shrinkage=.005,interaction.depth=4,
+              bag.fraction=0.5,train.fraction=.8,n.minobsinnode = 5,cv.folds=5,keep.data = T,verbose=F)
+ypred = predict(Chi.gbm,newdata=ChiTest2,n.trees=1837)
+ypred2 = exp(predict(Chi.gbm,newdata=ChiTest2,n.trees=1837))
+PredAcc(ypred2,ChiTest2$ListPrice)
+# MAPE = 17.8692
+```
+Notes from console:
+Increasing interaction.depth from 4 to 6 increased MAPE from 17.87 to 17.93
+Decreasing shrinkage from 0.005 to 0.0025 increased MAPE to 18.36
+The above Chi.gbm is the final model.
+
+Cubist stuff:
+```{r}
+x = ChiTrain2[,-3]
+y = log(ChiTrain2$ListPrice)
+```
+
+```{r}
+Chi.cubist = cubist(x,y)
+summary(Chi.cubist)
+```
+```{r}
+xtest = ChiTest2[,3]
+ypredlog = predict(Chi.cubist,newdata=ChiTest2)
+ypred = exp(predict(Chi.cubist,newdata=ChiTest2))
+PredAcc(ChiTest2$ListPrice,ypred)
+#MAPE = 22.429
+```
+
+```{r}
+Chi.cubist2 = cubist(x,y,committees=10)
+ypred = exp(predict(Chi.cubist2,newdata=ChiTest2))
+PredAcc(ChiTest2$ListPrice,ypred)
+#MAPE increased to 23.35902
+```
+Changing neighbors didn't change anything. increasing committees worsened MAPE.
+
+QUESTIONS:
+For boosted trees - I didn't make a validation set, and instead used the test set to adjust my model. Am I really able to compre across models, then?
